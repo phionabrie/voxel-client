@@ -1,1 +1,2 @@
-require('./hello-world.js')({server: "ws://localhost:8080/"})
+// bind to public interface
+require('./hello-world.js')({server: "ws://0.0.0.0:8080/"})

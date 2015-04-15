@@ -1,7 +1,8 @@
 var url = require('url')
 var websocket = require('websocket-stream')
 var engine = require('voxel-engine')
-var duplexEmitter = require('duplex-emitter')
+//var duplexEmitter = require('duplex-emitter')
+var EventEmitter = require('events').EventEmitter
 var toolbar = require('toolbar')
 var randomName = require('./randomname')
 var crunch = require('voxel-crunch')
@@ -11,6 +12,37 @@ var skin = require('minecraft-skin')
 var player = require('voxel-player')
 var texturePath = "/textures/"
 //var game
+// My own DuplexEmitter that works in Chrome
+var de = function(socket) {
+  var self = this;
+  var ee = new EventEmitter();//.call(this);
+
+  socket.on('data', function(data) {
+    var f = new FileReader();
+    f.readAsText(data);
+    f.addEventListener('loadend', function() {
+      //console.log('Read: ' + f.result)
+      var d 
+      try {
+        d = JSON.parse(f.result)
+      } catch(err) {
+        return;
+      }
+      ee.emit.apply(ee, d);
+    });
+  });
+
+  this.on = function() {
+    ee.on.apply(ee, Array.prototype.slice.apply(arguments));
+  }
+
+  this.emit = function() {
+    var message = JSON.stringify(Array.prototype.slice.apply(arguments)) + '\n';
+    //console.log('Writing: ' + message);
+    socket.write(message);
+  };
+};
+
 
 module.exports = Client
 
@@ -42,8 +74,8 @@ Client.prototype.connect = function(server, game) {
 
 Client.prototype.bindEvents = function(socket, game) {
   var self = this
-  this.emitter = duplexEmitter(socket)
-  var emitter = this.emitter
+  //this.emitter = duplexEmitter(socket)
+  var emitter = this.emitter = new de(socket)
   this.connected = true
 
   emitter.on('id', function(id) {
