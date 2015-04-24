@@ -11,6 +11,32 @@ var highlight = require('voxel-highlight')
 var skin = require('minecraft-skin')
 var player = require('voxel-player')
 var texturePath = "/textures/"
+
+var throttle = function(callback, max) {
+  var last = 0
+  var timeout
+  // cache last call's arguments, for the timeout
+  return function() {
+    var now = Date.now()
+    var diff = now - last
+    if (timeout) {
+      clearTimeout(timeout)
+      timeout = null
+    }
+    if (diff < max) {
+      // If it's too soon to trigger the callback, schedule for later
+      setTimeout(
+        callback(),
+        // try to schedule it to be right on time
+        max - diff + 10
+      )
+      return
+    }
+    callback()
+    last = now
+  }
+}
+
 //var game
 // My own DuplexEmitter that works in Chrome
 var de = function(socket) {
@@ -18,18 +44,13 @@ var de = function(socket) {
   var ee = new EventEmitter();//.call(this);
 
   socket.on('data', function(data) {
-    var f = new FileReader();
-    f.readAsText(data);
-    f.addEventListener('loadend', function() {
-      //console.log('Read: ' + f.result)
-      var d 
-      try {
-        d = JSON.parse(f.result)
-      } catch(err) {
-        return;
-      }
-      ee.emit.apply(ee, d);
-    });
+    var d 
+    try {
+      d = JSON.parse(data.toString())
+    } catch(err) {
+      return;
+    }
+    ee.emit.apply(ee, d);
   });
 
   this.on = function() {
@@ -38,7 +59,6 @@ var de = function(socket) {
 
   this.emit = function() {
     var message = JSON.stringify(Array.prototype.slice.apply(arguments)) + '\n';
-    //console.log('Writing: ' + message);
     socket.write(message);
   };
 };
@@ -91,6 +111,7 @@ Client.prototype.bindEvents = function(socket, game) {
   })
   
   emitter.on('settings', function(settings) {
+    settings.isClient = true
     settings.texturePath = texturePath
     settings.generateChunks = false
 	//deserialise the voxel.generator function.
@@ -100,8 +121,9 @@ Client.prototype.bindEvents = function(socket, game) {
     self.game = self.createGame(settings, game)	
 	emitter.emit('created')
     emitter.on('chunk', function(encoded, chunk) {
-      var voxels = crunch.decode(encoded, new Uint32Array(chunk.length))
+      var voxels = crunch.decode(encoded, new Uint16Array(chunk.length))
       chunk.voxels = voxels
+      chunk.dims = [settings.chunkSize, settings.chunkSize, settings.chunkSize]
       self.game.showChunk(chunk)
     })
   })
@@ -118,18 +140,22 @@ Client.prototype.createGame = function(settings, game) {
   settings.controlsDisabled = false
   self.game = engine(settings)
   self.game.settings = settings
-  function sendState() {
-    if (!self.connected) return
-    var player = self.game.controls.target()
-    var state = {
-      position: player.yaw.position,
-      rotation: {
-        y: player.yaw.rotation.y,
-        x: player.pitch.rotation.x
+
+  var sendState = throttle(
+    function() {
+      if (!self.connected) return
+      var player = self.game.controls.target()
+      var state = {
+        position: player.yaw.position,
+        rotation: {
+          y: player.yaw.rotation.y,
+          x: player.pitch.rotation.x
+        }
       }
-    }
-    emitter.emit('state', state)
-  }
+      emitter.emit('state', state)
+    },
+    50
+  )
   
   var name = localStorage.getItem('name')
   if (!name) {
@@ -142,6 +168,7 @@ Client.prototype.createGame = function(settings, game) {
     Object.keys(state).map(function(control) {
       if (state[control] > 0) interacting = true
     })
+    // should debounce this
     if (interacting) sendState()
   })
     
@@ -163,6 +190,26 @@ Client.prototype.createGame = function(settings, game) {
     self.game.scene.remove(self.others[id].mesh)
     delete self.others[id]
   })
+
+  self.game.voxels.on('missingChunk', function(chunkPos) {
+    var chunkID = chunkPos.join('|')
+    emitter.emit('need', chunkID)
+  })
+
+  // right click
+  function raycast(dist) {
+    dist = dist || 100
+    var pos = self.game.cameraPosition()
+    var vec = self.game.cameraVector()
+    return self.game.raycastVoxels(pos, vec, dist)
+  }
+  document.addEventListener('mousedown', function(e) {
+    if (e.button === 2) {
+      var block = raycast()
+      if (block) self.game.setBlock(block.position, 1)
+    }
+  })
+
   
   return self.game
 }
