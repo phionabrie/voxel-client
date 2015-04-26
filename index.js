@@ -121,8 +121,7 @@ Client.prototype.bindEvents = function(socket, game) {
     self.game = self.createGame(settings, game)	
 	emitter.emit('created')
     emitter.on('chunk', function(encoded, chunk) {
-      var voxels = crunch.decode(encoded, new Uint16Array(chunk.length))
-      chunk.voxels = voxels
+      chunk.voxels = crunch.decode(encoded, new Uint16Array(chunk.length))
       chunk.dims = [settings.chunkSize, settings.chunkSize, settings.chunkSize]
       self.game.showChunk(chunk)
     })
