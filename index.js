@@ -3,7 +3,6 @@ var websocket = require('websocket-stream')
 var engine = require('voxel-engine')
 //var duplexEmitter = require('duplex-emitter')
 var EventEmitter = require('events').EventEmitter
-var toolbar = require('toolbar')
 var randomName = require('./randomname')
 var crunch = require('voxel-crunch')
 var emitChat = require('./chat')
@@ -70,7 +69,6 @@ function Client(server, game) {
   if(!(this instanceof Client)) {
     return new Client(server, game)
   }
-  // this.blockSelector = toolbar({el: '#tools'})
   this.playerID
   this.lastProcessedSeq = 0
   this.localInputs = []
@@ -121,7 +119,7 @@ Client.prototype.bindEvents = function(socket, game) {
     self.game = self.createGame(settings, game)	
 	emitter.emit('created')
     emitter.on('chunk', function(encoded, chunk) {
-      chunk.voxels = crunch.decode(encoded, new Uint16Array(chunk.length))
+      chunk.voxels = crunch.decode(encoded, new Uint8Array(chunk.length))
       chunk.dims = [settings.chunkSize, settings.chunkSize, settings.chunkSize]
       self.game.showChunk(chunk)
     })
@@ -195,21 +193,6 @@ Client.prototype.createGame = function(settings, game) {
     emitter.emit('need', chunkID)
   })
 
-  // right click
-  function raycast(dist) {
-    dist = dist || 100
-    var pos = self.game.cameraPosition()
-    var vec = self.game.cameraVector()
-    return self.game.raycastVoxels(pos, vec, dist)
-  }
-  document.addEventListener('mousedown', function(e) {
-    if (e.button === 2) {
-      var block = raycast()
-      if (block) self.game.setBlock(block.position, 1)
-    }
-  })
-
-  
   return self.game
 }
 

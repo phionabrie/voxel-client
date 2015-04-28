@@ -2,13 +2,14 @@ var createClient = require('../')
 var highlight = require('voxel-highlight')
 var extend = require('extend')
 var voxelPlayer = require('voxel-player')
+var toolbar = require('toolbar')
 var game
 
 module.exports = function(opts, setup) {
   setup = setup || defaultSetup
   opts = extend({}, opts || {})
 
-  var client = createClient(opts.server || "ws://localhost:8080/")
+  var client = createClient(opts.server || "ws://localhost:8080/", opts)
   
   client.emitter.on('noMoreChunks', function(id) {
     console.log("Attaching to the container and creating player")
@@ -34,6 +35,7 @@ module.exports = function(opts, setup) {
 function defaultSetup(game, avatar, client) {
   // highlight blocks when you look at them, hold <Ctrl> for block placement
   var blockPosPlace, blockPosErase
+  var currentMaterial = 1
   var hl = game.highlighter = highlight(game, { color: 0xff0000 })
   hl.on('highlight', function (voxelPos) { blockPosErase = voxelPos })
   hl.on('remove', function (voxelPos) { blockPosErase = null })
@@ -44,9 +46,6 @@ function defaultSetup(game, avatar, client) {
   window.addEventListener('keydown', function (ev) {
     if (ev.keyCode === 'R'.charCodeAt(0)) avatar.toggle()
   })
-
-  // block interaction stuff, uses highlight data
-  var currentMaterial = 1
 
   game.on('fire', function (target, state) {
     var position = blockPosPlace
@@ -62,4 +61,26 @@ function defaultSetup(game, avatar, client) {
       }
     }
   })
+
+  game.materialSelector = toolbar({el: '#tools'})
+  game.materialSelector.on('select', function(item) {
+    // This must be a number, or bad things happen
+    currentMaterial = Number(item)
+  })
+
+  // right click
+  /*
+  function raycast(dist) {
+    dist = dist || 100
+    var pos = game.cameraPosition()
+    var vec = game.cameraVector()
+    return game.raycastVoxels(pos, vec, dist)
+  }
+  document.addEventListener('mousedown', function(e) {
+    if (e.button === 2) {
+      var block = raycast()
+      if (block) game.setBlock(block.position, game.currentMaterial)
+    }
+  })
+  */
 }
