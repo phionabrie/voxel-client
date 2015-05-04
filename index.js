@@ -96,9 +96,10 @@ Client.prototype.bindEvents = function(socket, game) {
   var emitter = this.emitter = new de(socket)
   this.connected = true
 
-  emitter.on('id', function(id) {
+  emitter.on('id', function(id, avatarImage) {
     console.log('got id', id)
     self.playerID = id
+    self.avatarImage = avatarImage
     if (game != null) {
   	  self.game = game
   	  console.log("Sending local settings to the server.")
@@ -211,7 +212,7 @@ Client.prototype.updatePlayerPosition = function(id, update) {
   var pos = update.position
   var player = this.others[id]
   if (!player) {
-    var playerSkin = skin(this.game.THREE, 'player.png', {
+    var playerSkin = skin(this.game.THREE, update.avatarImage, {
       scale: new this.game.THREE.Vector3(0.04, 0.04, 0.04)
     })
     var playerMesh = playerSkin.mesh
